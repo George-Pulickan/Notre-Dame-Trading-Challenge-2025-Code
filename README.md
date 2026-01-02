@@ -6,21 +6,6 @@ This repository contains my submissions for the University of Notre Dame Trading
 
 The project demonstrates systematic trading design, market microstructure awareness, and disciplined risk management under realistic exchange constraints.
 
-Repository Structure
-.
-├── Case 1 - Algorithmic Trading/
-│   ├── src/
-│   │   └── delta_bot/
-│   │       ├── strategy.py
-│   │       ├── order_manager.py
-│   │       ├── risk.py
-│   │       └── quote_engine.py
-│   ├── pyproject.toml
-│   └── README.md
-│
-└── Case 2 - Manual Trading/
-    ├── analysis.py
-    └── prices.csv
 
 Case 1 – Algorithmic Trading (DELTA Exchange)
 
