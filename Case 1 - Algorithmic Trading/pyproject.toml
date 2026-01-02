@@ -1,0 +1,24 @@
+[project]
+name = "delta-bot"
+version = "0.1.0"
+description = "High-frequency ETF basket market maker and arbitrage bot for Delta Exchange competition"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Delta Bot Team" }]
+dependencies = [
+    "httpx>=0.27",
+    "exchange-sdk>=1.0",
+]
+
+[project.scripts]
+delta-bot = "delta_bot.runner:cli"
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.7",
+    "pytest>=8.3",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

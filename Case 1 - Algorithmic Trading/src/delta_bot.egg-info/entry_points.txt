@@ -1,0 +1,2 @@
+[console_scripts]
+delta-bot = delta_bot.runner:cli

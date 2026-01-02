@@ -1,0 +1,97 @@
+Metadata-Version: 2.4
+Name: delta-bot
+Version: 0.1.0
+Summary: High-frequency ETF basket market maker and arbitrage bot for Delta Exchange competition
+Author: Delta Bot Team
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: httpx>=0.27
+Requires-Dist: exchange-sdk>=1.0
+Provides-Extra: dev
+Requires-Dist: ruff>=0.7; extra == "dev"
+Requires-Dist: pytest>=8.3; extra == "dev"
+
+# Delta Exchange High-Frequency ETF Basket Market Maker
+
+A reference implementation of the maker-only ETF basket market-making and arbitrage bot outlined in the Notre Dame DELTA Exchange competition brief. The bot focuses on:
+
+- Synthetic fair-value tracking of the ETF basket (XYZ, ABC, DEF)
+- Wide, deep, layered passive liquidity on every symbol with configurable ladders
+- Maker-rebate-aware pricing in basis points (never sends taker flow)
+- Volatility-aware spread, size, and inventory skew adjustments
+- Persistent quote management that refreshes at 50–100 Hz without exceeding rate limits
+- Smart risk controls (inventory, exposure, drawdown) that reshape quotes instead of shutting down the book
+
+## Architecture Highlights
+
+- **`exchange.ExchangeClient`** – wraps the official `exchange-sdk` gateway for order entry/cancels and polls the scorekeeper HTTP API for 10-level books.
+- **`quote_engine`** – builds 5–8 level ladders per side using fee-aware bps math, volatility bumps, inventory skews, and global size scaling to keep ~$800k resting.
+- **`order_manager.OrderLadderManager`** – tracks every resting order, issues minimal replace/cancel calls, and throttles under 95 actions/sec.
+- **`strategy.Strategy`** – orchestrates the 50–100 Hz loop: pulls books, recomputes basket fair value, refreshes positions, updates risk state, and asynchronously syncs ladders for ETF + constituents.
+- **`risk`** – computes dollar exposure, unrealized/realized P&L, drawdown %, and outputs spread/size scaling directives instead of blunt kill-switches.
+
+Fill events from the official execution stream should be forwarded to `Strategy.register_fill(symbol, side, size, price)` so realized P&L stays in sync without relying on `/trades`.
+
+## Configuration
+
+All strategic constants live in `delta_bot/config.py`:
+
+- Basket weights (`SYNTHETIC_WEIGHTS`) for the ETF fair-value calc
+- Per-symbol ladder specs (`DEFAULT_SYMBOL_CONFIG`)
+- Risk guardrails (position cap, dollar exposure cap, drawdown thresholds)
+- Loop cadence, min refresh move in bps, maker/taker economics, etc.
+
+Tune these numbers (sizes, spreads, number of levels) to match your real exchange limits or to skew more aggressively when volatility expands.
+
+## Project Layout
+
+```
+src/
+  delta_bot/
+    __init__.py
+    config.py
+    exchange.py
+    models.py
+    order_manager.py
+    quote_engine.py
+    risk.py
+    strategy.py
+    runner.py
+```
+
+`runner.py` exposes `asyncio.run(main())`, which wires together the exchange client, strategy loop, and instrumentation scaffolding.
+
+## Getting Started
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+delta-bot  # or python -m delta_bot.runner
+```
+
+The default configuration uses placeholders for credentials and REST/WebSocket endpoints; integrate your competition keys plus the official gateways before live trading.
+
+### Environment variables
+
+Set the following before running the bot:
+
+| Variable | Purpose |
+| --- | --- |
+| `DELTA_TOKEN` | Team token issued by DELTA (default wired to `shortinggpa-129asfasd301`, override for safety) |
+
+Connectivity defaults (`159.65.173.202` + ports `9001/5001/8081`) live in `config.py`; tweak only if organizers change infrastructure.
+
+## Operational Notes
+
+- The quoting loop targets ~100 Hz; in production you should source books/positions from streaming APIs to keep REST loads manageable.
+- `OrderLadderManager` already enforces 95 actions/sec—stay within the 100/sec exchange cap even when volatility causes mass refreshes.
+- Drawdown logic halves size / widens spreads after a 15% equity dip and fully throttles past 25% until manual intervention.
+- Inventory skews automatically nudge bids/asks to bleed risk without pausing quoting; exposure scaling tapers global size once $5M notional is breached.
+- Unrealized P&L is recomputed off current mids each loop; realized P&L must come from `register_fill` ingest of live execution messages.
+
+## Next Steps
+
+1. Attach the gateway’s execution feed to `Strategy.register_fill(...)` so inventory and realized P&L track fills in real time.
+2. Dry-run in the sandbox cluster, monitoring the dashboard to verify quote ladders, order-rate throttling, and risk scaling under live volatility.
+3. Add telemetry (metrics/logging) outside the hot loop so you can monitor inventory, drawdown, and throttle states in real time.
